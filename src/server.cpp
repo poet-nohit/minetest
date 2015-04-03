@@ -27,7 +27,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "environment.h"
 #include "map.h"
 #include "jthread/jmutexautolock.h"
-#include "main.h"
 #include "constants.h"
 #include "voxel.h"
 #include "config.h"
@@ -1018,10 +1017,11 @@ void Server::Receive()
 	DSTACK(__FUNCTION_NAME);
 	SharedBuffer<u8> data;
 	u16 peer_id;
-	u32 datasize;
 	try {
-		datasize = m_con.Receive(peer_id,data);
-		ProcessData(*data, datasize, peer_id);
+		NetworkPacket pkt;
+		m_con.Receive(&pkt);
+		peer_id = pkt.getPeerId();
+		ProcessData(&pkt);
 	}
 	catch(con::InvalidIncomingDataException &e) {
 		infostream<<"Server::Receive(): "
@@ -1149,13 +1149,14 @@ inline void Server::handleCommand(NetworkPacket* pkt)
 	(this->*opHandle.handler)(pkt);
 }
 
-void Server::ProcessData(u8 *data, u32 datasize, u16 peer_id)
+void Server::ProcessData(NetworkPacket *pkt)
 {
 	DSTACK(__FUNCTION_NAME);
 	// Environment is locked first.
 	JMutexAutoLock envlock(m_env_mutex);
 
 	ScopeProfiler sp(g_profiler, "Server::ProcessData");
+	u32 peer_id = pkt->getPeerId();
 
 	try {
 		Address address = getPeerAddress(peer_id);
@@ -1179,18 +1180,13 @@ void Server::ProcessData(u8 *data, u32 datasize, u16 peer_id)
 		 * respond for some time, your server was overloaded or
 		 * things like that.
 		 */
-		infostream << "Server::ProcessData(): Cancelling: peer "
+		infostream << "Server::ProcessData(): Canceling: peer "
 				<< peer_id << " not found" << std::endl;
 		return;
 	}
 
 	try {
-		if(datasize < 2)
-			return;
-
-		NetworkPacket pkt(data, datasize, peer_id);
-
-		ToServerCommand command = (ToServerCommand) pkt.getCommand();
+		ToServerCommand command = (ToServerCommand) pkt->getCommand();
 
 		// Command must be handled into ToServerCommandHandler
 		if (command >= TOSERVER_NUM_MSG_TYPES) {
@@ -1199,7 +1195,7 @@ void Server::ProcessData(u8 *data, u32 datasize, u16 peer_id)
 		}
 
 		if (toServerCommandTable[command].state == TOSERVER_STATE_NOT_CONNECTED) {
-			handleCommand(&pkt);
+			handleCommand(pkt);
 			return;
 		}
 
@@ -1214,7 +1210,7 @@ void Server::ProcessData(u8 *data, u32 datasize, u16 peer_id)
 
 		/* Handle commands related to client startup */
 		if (toServerCommandTable[command].state == TOSERVER_STATE_STARTUP) {
-			handleCommand(&pkt);
+			handleCommand(pkt);
 			return;
 		}
 
@@ -1227,7 +1223,7 @@ void Server::ProcessData(u8 *data, u32 datasize, u16 peer_id)
 			return;
 		}
 
-		handleCommand(&pkt);
+		handleCommand(pkt);
 	}
 	catch(SendFailedException &e) {
 		errorstream << "Server::ProcessData(): SendFailedException: "
@@ -2526,7 +2522,7 @@ void Server::RespawnPlayer(u16 peer_id)
 
 	bool repositioned = m_script->on_respawnplayer(playersao);
 	if(!repositioned){
-		v3f pos = findSpawnPos(m_env->getServerMap());
+		v3f pos = findSpawnPos();
 		// setPos will send the new position to client
 		playersao->setPos(pos);
 	}
@@ -3183,23 +3179,24 @@ std::string Server::getBuiltinLuaPath()
 	return porting::path_share + DIR_DELIM + "builtin";
 }
 
-v3f findSpawnPos(ServerMap &map)
+v3f Server::findSpawnPos()
 {
-	//return v3f(50,50,50)*BS;
+	ServerMap &map = m_env->getServerMap();
+	v3f nodeposf;
+	if (g_settings->getV3FNoEx("static_spawnpoint", nodeposf)) {
+		return nodeposf * BS;
+	}
 
-	v3s16 nodepos;
+	// Default position is static_spawnpoint
+	// We will return it if we don't found a good place
+	v3s16 nodepos(nodeposf.X, nodeposf.Y, nodeposf.Z);
 
-#if 0
-	nodepos = v2s16(0,0);
-	groundheight = 20;
-#endif
-
-#if 1
 	s16 water_level = map.getWaterLevel();
 
+	bool is_good = false;
+
 	// Try to find a good place a few times
-	for(s32 i=0; i<1000; i++)
-	{
+	for(s32 i = 0; i < 1000 && !is_good; i++) {
 		s32 range = 1 + i;
 		// We're going to try to throw the player to this position
 		v2s16 nodepos2d = v2s16(
@@ -3214,7 +3211,7 @@ v3f findSpawnPos(ServerMap &map)
 			continue;
 
 		nodepos = v3s16(nodepos2d.X, groundheight, nodepos2d.Y);
-		bool is_good = false;
+
 		s32 air_count = 0;
 		for (s32 i = 0; i < 10; i++) {
 			v3s16 blockpos = getNodeBlockPos(nodepos);
@@ -3229,13 +3226,7 @@ v3f findSpawnPos(ServerMap &map)
 			}
 			nodepos.Y++;
 		}
-		if(is_good){
-			// Found a good place
-			//infostream<<"Searched through "<<i<<" places."<<std::endl;
-			break;
-		}
 	}
-#endif
 
 	return intToFloat(nodepos, BS);
 }
@@ -3278,7 +3269,7 @@ PlayerSAO* Server::emergePlayer(const char *name, u16 peer_id)
 		// Set player position
 		infostream<<"Server: Finding spawn place for player \""
 				<<name<<"\""<<std::endl;
-		v3f pos = findSpawnPos(m_env->getServerMap());
+		v3f pos = findSpawnPos();
 		player->setPosition(pos);
 
 		// Make sure the player is saved

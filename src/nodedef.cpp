@@ -19,7 +19,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "nodedef.h"
 
-#include "main.h" // For g_settings
 #include "itemdef.h"
 #ifndef SERVER
 #include "client/tile.h"
@@ -930,7 +929,7 @@ void CNodeDefManager::fillTileAttribs(ITextureSource *tsrc, TileSpec *tile,
 		bool backface_culling, u8 alpha, u8 material_type)
 {
 	tile->shader_id     = shader_id;
-	tile->texture       = tsrc->getTexture(tiledef->name, &tile->texture_id);
+	tile->texture       = tsrc->getTextureForMesh(tiledef->name, &tile->texture_id);
 	tile->alpha         = alpha;
 	tile->material_type = material_type;
 
@@ -973,7 +972,7 @@ void CNodeDefManager::fillTileAttribs(ITextureSource *tsrc, TileSpec *tile,
 			os << tiledef->name << "^[verticalframe:"
 				<< frame_count << ":" << i;
 
-			frame.texture = tsrc->getTexture(os.str(), &frame.texture_id);
+			frame.texture = tsrc->getTextureForMesh(os.str(), &frame.texture_id);
 			if (tile->normal_texture)
 				frame.normal_texture = tsrc->getNormalTexture(os.str());
 			tile->frames[i] = frame;

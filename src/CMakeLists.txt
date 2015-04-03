@@ -329,6 +329,7 @@ set(common_SRCS
 	pathfinder.cpp
 	player.cpp
 	porting.cpp
+	profiler.cpp
 	quicktune.cpp
 	rollback.cpp
 	rollback_interface.cpp
@@ -405,9 +406,11 @@ set(client_SRCS
 	guiFormSpecMenu.cpp
 	guiKeyChangeMenu.cpp
 	guiPasswordChange.cpp
+	guiscalingfilter.cpp
 	guiTable.cpp
 	guiVolumeChange.cpp
 	hud.cpp
+	imagefilters.cpp
 	keycode.cpp
 	localplayer.cpp
 	main.cpp

@@ -63,11 +63,6 @@ enum ClientDeletionReason {
 	CDR_DENY
 };
 
-/*
-	Some random functions
-*/
-v3f findSpawnPos(ServerMap &map);
-
 class MapEditEventIgnorer
 {
 public:
@@ -219,7 +214,7 @@ public:
 	void handleCommand_NodeMetaFields(NetworkPacket* pkt);
 	void handleCommand_InventoryFields(NetworkPacket* pkt);
 
-	void ProcessData(u8 *data, u32 datasize, u16 peer_id);
+	void ProcessData(NetworkPacket *pkt);
 
 	void Send(NetworkPacket* pkt);
 
@@ -473,6 +468,8 @@ private:
 	void RespawnPlayer(u16 peer_id);
 	void DeleteClient(u16 peer_id, ClientDeletionReason reason);
 	void UpdateCrafting(Player *player);
+
+	v3f findSpawnPos();
 
 	// When called, connection mutex should be locked
 	RemoteClient* getClient(u16 peer_id,ClientState state_min=CS_Active);

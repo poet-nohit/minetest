@@ -28,7 +28,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "util/string.h"
 #include "client.h"
 #include "network/clientopcodes.h"
-#include "main.h"
 #include "filesys.h"
 #include "porting.h"
 #include "mapblock_mesh.h"
@@ -49,6 +48,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "drawscene.h"
 #include "database-sqlite3.h"
 #include "serialization.h"
+#include "guiscalingfilter.h"
 
 extern gui::IGUIEnvironment* guienv;
 
@@ -834,10 +834,9 @@ void Client::ReceiveAll()
 void Client::Receive()
 {
 	DSTACK(__FUNCTION_NAME);
-	SharedBuffer<u8> data;
-	u16 sender_peer_id;
-	u32 datasize = m_con.Receive(sender_peer_id, data);
-	ProcessData(*data, datasize, sender_peer_id);
+	NetworkPacket pkt;
+	m_con.Receive(&pkt);
+	ProcessData(&pkt);
 }
 
 inline void Client::handleCommand(NetworkPacket* pkt)
@@ -849,19 +848,12 @@ inline void Client::handleCommand(NetworkPacket* pkt)
 /*
 	sender_peer_id given to this shall be quaranteed to be a valid peer
 */
-void Client::ProcessData(u8 *data, u32 datasize, u16 sender_peer_id)
+void Client::ProcessData(NetworkPacket *pkt)
 {
 	DSTACK(__FUNCTION_NAME);
 
-	// Ignore packets that don't even fit a command
-	if(datasize < 2) {
-		m_packetcounter.add(60000);
-		return;
-	}
-
-	NetworkPacket pkt(data, datasize, sender_peer_id);
-
-	ToClientCommand command = (ToClientCommand) pkt.getCommand();
+	ToClientCommand command = (ToClientCommand) pkt->getCommand();
+	u32 sender_peer_id = pkt->getPeerId();
 
 	//infostream<<"Client: received command="<<command<<std::endl;
 	m_packetcounter.add((u16)command);
@@ -889,7 +881,7 @@ void Client::ProcessData(u8 *data, u32 datasize, u16 sender_peer_id)
 	 * as a byte mask
 	 */
 	if(toClientCommandTable[command].state == TOCLIENT_STATE_NOT_CONNECTED) {
-		handleCommand(&pkt);
+		handleCommand(pkt);
 		return;
 	}
 
@@ -904,7 +896,7 @@ void Client::ProcessData(u8 *data, u32 datasize, u16 sender_peer_id)
 	  Handle runtime commands
 	*/
 
-	handleCommand(&pkt);
+	handleCommand(pkt);
 }
 
 void Client::Send(NetworkPacket* pkt)
@@ -1615,6 +1607,11 @@ void Client::afterContentReceived(IrrlichtDevice *device)
 
 	const wchar_t* text = wgettext("Loading textures...");
 
+	// Clear cached pre-scaled 2D GUI images, as this cache
+	// might have images with the same name but different
+	// content from previous sessions.
+	guiScalingCacheClear(device->getVideoDriver());
+
 	// Rebuild inherited images and recreate textures
 	infostream<<"- Rebuilding images and textures"<<std::endl;
 	draw_load_screen(text,device, guienv, 0, 70);
@@ -1704,25 +1701,42 @@ void Client::makeScreenshot(IrrlichtDevice *device)
 {
 	irr::video::IVideoDriver *driver = device->getVideoDriver();
 	irr::video::IImage* const raw_image = driver->createScreenShot();
-	if (raw_image) {
-		irr::video::IImage* const image = driver->createImage(video::ECF_R8G8B8,
-			raw_image->getDimension());
+
+	if (!raw_image)
+		return;
+
+	time_t t = time(NULL);
+	struct tm *tm = localtime(&t);
+
+	char timetstamp_c[64];
+	strftime(timetstamp_c, sizeof(timetstamp_c), "%FT%T", tm);
+
+	std::string filename_base = g_settings->get("screenshot_path")
+			+ DIR_DELIM
+			+ std::string("screenshot_")
+			+ std::string(timetstamp_c);
+	std::string filename_ext = ".png";
+	std::string filename;
+
+	// Try to find a unique filename
+	unsigned serial = 0;
+
+	while (serial < SCREENSHOT_MAX_SERIAL_TRIES) {
+		filename = filename_base + (serial > 0 ? ("-" + itos(serial)) : "") + filename_ext;
+		std::ifstream tmp(filename.c_str());
+		if (!tmp.good())
+			break;	// File did not apparently exist, we'll go with it
+		serial++;
+	}
+
+	if (serial == SCREENSHOT_MAX_SERIAL_TRIES) {
+		infostream << "Could not find suitable filename for screenshot" << std::endl;
+	} else {
+		irr::video::IImage* const image =
+				driver->createImage(video::ECF_R8G8B8, raw_image->getDimension());
 
 		if (image) {
 			raw_image->copyTo(image);
-
-			std::string filename;
-
-			time_t t = time(NULL);
-			struct tm *tm = localtime(&t);
-			char timetstamp_c[16]; // YYYYMMDD_HHMMSS + '\0'
-			strftime(timetstamp_c, sizeof(timetstamp_c), "%Y%m%d_%H%M%S", tm);
-
-			filename = g_settings->get("screenshot_path")
-			         + DIR_DELIM
-			         + std::string("screenshot_")
-			         + std::string(timetstamp_c)
-			         + ".png";
 
 			std::ostringstream sstr;
 			if (driver->writeImageToFile(image, filename.c_str())) {
@@ -1734,8 +1748,9 @@ void Client::makeScreenshot(IrrlichtDevice *device)
 			infostream << sstr.str() << std::endl;
 			image->drop();
 		}
-		raw_image->drop();
 	}
+
+	raw_image->drop();
 }
 
 // IGameDef interface

@@ -143,9 +143,11 @@ LOCAL_SRC_FILES :=                                \
 		jni/src/guiKeyChangeMenu.cpp              \
 		jni/src/guiPasswordChange.cpp             \
 		jni/src/guiTable.cpp                      \
+		jni/src/guiscalingfilter.cpp              \
 		jni/src/guiVolumeChange.cpp               \
 		jni/src/httpfetch.cpp                     \
 		jni/src/hud.cpp                           \
+		jni/src/imagefilters.cpp                  \
 		jni/src/inventory.cpp                     \
 		jni/src/inventorymanager.cpp              \
 		jni/src/itemdef.cpp                       \
@@ -181,6 +183,7 @@ LOCAL_SRC_FILES :=                                \
 		jni/src/player.cpp                        \
 		jni/src/porting_android.cpp               \
 		jni/src/porting.cpp                       \
+		jni/src/profiler.cpp                      \
 		jni/src/quicktune.cpp                     \
 		jni/src/rollback.cpp                      \
 		jni/src/rollback_interface.cpp            \

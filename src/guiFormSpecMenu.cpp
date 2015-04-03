@@ -44,13 +44,13 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "gettext.h"
 #include "scripting_game.h"
 #include "porting.h"
-#include "main.h"
 #include "settings.h"
 #include "client.h"
 #include "fontengine.h"
 #include "util/hex.h"
 #include "util/numeric.h"
 #include "util/string.h" // for parseColorString()
+#include "guiscalingfilter.h"
 
 #define MY_CHECKPOS(a,b)													\
 	if (v_pos.size() != 2) {												\
@@ -1307,8 +1307,10 @@ void GUIFormSpecMenu::parseImageButton(parserData* data,std::string element,
 		}
 
 		e->setUseAlphaChannel(true);
-		e->setImage(texture);
-		e->setPressedImage(pressed_texture);
+		e->setImage(guiScalingImageButton(
+			Environment->getVideoDriver(), texture, geom.X, geom.Y));
+		e->setPressedImage(guiScalingImageButton(
+			Environment->getVideoDriver(), pressed_texture, geom.X, geom.Y));
 		e->setScaleImage(true);
 		e->setNotClipped(noclip);
 		e->setDrawBorder(drawborder);
@@ -1452,8 +1454,8 @@ void GUIFormSpecMenu::parseItemImageButton(parserData* data,std::string element)
 		}
 
 		e->setUseAlphaChannel(true);
-		e->setImage(texture);
-		e->setPressedImage(texture);
+		e->setImage(guiScalingImageButton(Environment->getVideoDriver(), texture, geom.X, geom.Y));
+		e->setPressedImage(guiScalingImageButton(Environment->getVideoDriver(), texture, geom.X, geom.Y));
 		e->setScaleImage(true);
 		spec.ftype = f_Button;
 		rect+=data->basepos-padding;
@@ -2283,7 +2285,7 @@ void GUIFormSpecMenu::drawMenu()
 
 			const video::SColor color(255,255,255,255);
 			const video::SColor colors[] = {color,color,color,color};
-			driver->draw2DImage(texture, rect,
+			draw2DImageFilterScaled(driver, texture, rect,
 				core::rect<s32>(core::position2d<s32>(0,0),
 						core::dimension2di(texture->getOriginalSize())),
 				NULL/*&AbsoluteClippingRect*/, colors, true);
@@ -2333,7 +2335,7 @@ void GUIFormSpecMenu::drawMenu()
 			core::rect<s32> rect = imgrect + spec.pos;
 			const video::SColor color(255,255,255,255);
 			const video::SColor colors[] = {color,color,color,color};
-			driver->draw2DImage(texture, rect,
+			draw2DImageFilterScaled(driver, texture, rect,
 				core::rect<s32>(core::position2d<s32>(0,0),img_origsize),
 				NULL/*&AbsoluteClippingRect*/, colors, true);
 		}
@@ -2362,7 +2364,7 @@ void GUIFormSpecMenu::drawMenu()
 		core::rect<s32> rect = imgrect + spec.pos;
 		const video::SColor color(255,255,255,255);
 		const video::SColor colors[] = {color,color,color,color};
-		driver->draw2DImage(texture, rect,
+		draw2DImageFilterScaled(driver, texture, rect,
 			core::rect<s32>(core::position2d<s32>(0,0),
 					core::dimension2di(texture->getOriginalSize())),
 			NULL/*&AbsoluteClippingRect*/, colors, true);
