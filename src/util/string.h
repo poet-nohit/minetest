@@ -43,7 +43,8 @@ wchar_t *narrow_to_wide_c(const char *str);
 
 std::wstring narrow_to_wide(const std::string &mbs);
 std::string wide_to_narrow(const std::wstring &wcs);
-std::string translatePassword(std::string playername, std::wstring password);
+std::string translatePassword(const std::string &playername,
+	const std::string &password);
 std::string urlencode(std::string str);
 std::string urldecode(std::string str);
 u32 readFlagString(std::string str, const FlagDesc *flagdesc, u32 *flagmask);
@@ -150,6 +151,24 @@ inline bool str_starts_with(const std::basic_string<T> &str,
 	return true;
 }
 
+/**
+ * Check whether \p str begins with the string prefix. If \p case_insensitive
+ * is true then the check is case insensitve (default is false; i.e. case is
+ * significant).
+ *
+ * @param str
+ * @param prefix
+ * @param case_insensitive
+ * @return true if the str begins with prefix
+ */
+template <typename T>
+inline bool str_starts_with(const std::basic_string<T> &str,
+		const T *prefix,
+		bool case_insensitive = false)
+{
+	return str_starts_with(str, std::basic_string<T>(prefix),
+			case_insensitive);
+}
 
 /**
  * Splits a string into its component parts separated by the character

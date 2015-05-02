@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 2.6)
 
-project(Minetest)
-string(TOLOWER ${PROJECT_NAME} PROJECT_NAME_LOWER)
+project(minetest)
 
 INCLUDE(CheckIncludeFiles)
 
@@ -111,23 +110,30 @@ option(ENABLE_FREETYPE "Enable FreeType2 (TrueType fonts and basic unicode suppo
 set(USE_FREETYPE FALSE)
 
 if(ENABLE_FREETYPE)
-	if(UNIX)
-		include(FindPkgConfig)
-		if(PKG_CONFIG_FOUND)
-			pkg_check_modules(FREETYPE QUIET freetype2)
-			if(FREETYPE_FOUND)
-				SET(FREETYPE_PKGCONFIG_FOUND TRUE)
-				SET(FREETYPE_LIBRARY ${FREETYPE_LIBRARIES})
-				# Because CMake is idiotic
-				string(REPLACE ";" " " FREETYPE_CFLAGS_STR ${FREETYPE_CFLAGS})
-				string(REPLACE ";" " " FREETYPE_LDFLAGS_STR ${FREETYPE_LDFLAGS})
-			endif(FREETYPE_FOUND)
-		endif(PKG_CONFIG_FOUND)
-	endif(UNIX)
-	if(NOT FREETYPE_FOUND)
-		find_package(Freetype)
-	endif()
+##
+## Note: FindFreetype.cmake seems to have been fixed in recent versions of
+## CMake. If issues persist, re-enable this workaround specificially for the
+## failing platforms.
+##
+#	if(UNIX)
+#		include(FindPkgConfig)
+#		if(PKG_CONFIG_FOUND)
+#			pkg_check_modules(FREETYPE QUIET freetype2)
+#			if(FREETYPE_FOUND)
+#				SET(FREETYPE_PKGCONFIG_FOUND TRUE)
+#				SET(FREETYPE_LIBRARY ${FREETYPE_LIBRARIES})
+#				# Because CMake is idiotic
+#				string(REPLACE ";" " " FREETYPE_CFLAGS_STR ${FREETYPE_CFLAGS})
+#				string(REPLACE ";" " " FREETYPE_LDFLAGS_STR ${FREETYPE_LDFLAGS})
+#			endif(FREETYPE_FOUND)
+#		endif(PKG_CONFIG_FOUND)
+#	endif(UNIX)
+#	if(NOT FREETYPE_FOUND)
+#		find_package(Freetype)
+#	endif()
+	find_package(Freetype)
 	if(FREETYPE_FOUND)
+		message(STATUS "Freetype enabled.")
 		set(USE_FREETYPE TRUE)
 		set(CGUITTFONT_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cguittfont")
 		set(CGUITTFONT_LIBRARY cguittfont)
@@ -188,8 +194,10 @@ if(WIN32)
 		# Surpress some useless warnings
 		add_definitions ( /D "_CRT_SECURE_NO_DEPRECATE" /W1 )
 	else() # Probably MinGW = GCC
-		set(PLATFORM_LIBS ws2_32.lib)
+		set(PLATFORM_LIBS "")
 	endif()
+	set(PLATFORM_LIBS ws2_32.lib shlwapi.lib ${PLATFORM_LIBS})
+
 	# Zlib stuff
 	set(ZLIB_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/../../zlib/zlib-1.2.5"
 			CACHE PATH "Zlib include directory")
@@ -269,12 +277,8 @@ add_custom_target(GenerateVersion
 add_subdirectory(jthread)
 add_subdirectory(network)
 add_subdirectory(script)
+add_subdirectory(unittest)
 add_subdirectory(util)
-
-
-set (unittests_SRCS
-	test.cpp
-)
 
 set(common_SRCS
 	ban.cpp
@@ -351,7 +355,7 @@ set(common_SRCS
 	${JTHREAD_SRCS}
 	${common_SCRIPT_SRCS}
 	${UTIL_SRCS}
-	${unittests_SRCS}
+	${UNITTEST_SRCS}
 )
 
 
@@ -460,10 +464,10 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/bin")
 
 
 if(BUILD_CLIENT)
-	add_executable(${PROJECT_NAME_LOWER} ${client_SRCS})
-	add_dependencies(${PROJECT_NAME_LOWER} GenerateVersion)
+	add_executable(${PROJECT_NAME} ${client_SRCS})
+	add_dependencies(${PROJECT_NAME} GenerateVersion)
 	set(client_LIBS
-		${PROJECT_NAME_LOWER}
+		${PROJECT_NAME}
 		${ZLIB_LIBRARIES}
 		${IRRLICHT_LIBRARY}
 		${OPENGL_LIBRARIES}
@@ -492,37 +496,37 @@ if(BUILD_CLIENT)
 	endif()
 	if(USE_CURL)
 		target_link_libraries(
-			${PROJECT_NAME_LOWER}
+			${PROJECT_NAME}
 			${CURL_LIBRARY}
 		)
 	endif()
 	if(USE_FREETYPE)
 		if(FREETYPE_PKGCONFIG_FOUND)
-			set_target_properties(${PROJECT_NAME_LOWER}
+			set_target_properties(${PROJECT_NAME}
 				PROPERTIES
 				COMPILE_FLAGS "${FREETYPE_CFLAGS_STR}"
 			)
 		endif()
 		target_link_libraries(
-			${PROJECT_NAME_LOWER}
+			${PROJECT_NAME}
 			${FREETYPE_LIBRARY}
 			${CGUITTFONT_LIBRARY}
 		)
 	endif()
 	if (USE_LEVELDB)
-		target_link_libraries(${PROJECT_NAME_LOWER} ${LEVELDB_LIBRARY})
+		target_link_libraries(${PROJECT_NAME} ${LEVELDB_LIBRARY})
 	endif()
 	if (USE_REDIS)
-		target_link_libraries(${PROJECT_NAME_LOWER} ${REDIS_LIBRARY})
+		target_link_libraries(${PROJECT_NAME} ${REDIS_LIBRARY})
 	endif()
 endif(BUILD_CLIENT)
 
 
 if(BUILD_SERVER)
-	add_executable(${PROJECT_NAME_LOWER}server ${server_SRCS})
-	add_dependencies(${PROJECT_NAME_LOWER}server GenerateVersion)
+	add_executable(${PROJECT_NAME}server ${server_SRCS})
+	add_dependencies(${PROJECT_NAME}server GenerateVersion)
 	target_link_libraries(
-		${PROJECT_NAME_LOWER}server
+		${PROJECT_NAME}server
 		${ZLIB_LIBRARIES}
 		${SQLITE3_LIBRARY}
 		${JSON_LIBRARY}
@@ -530,17 +534,17 @@ if(BUILD_SERVER)
 		${LUA_LIBRARY}
 		${PLATFORM_LIBS}
 	)
-	set_target_properties(${PROJECT_NAME_LOWER}server PROPERTIES
+	set_target_properties(${PROJECT_NAME}server PROPERTIES
 			COMPILE_DEFINITIONS "SERVER")
 	if (USE_LEVELDB)
-		target_link_libraries(${PROJECT_NAME_LOWER}server ${LEVELDB_LIBRARY})
+		target_link_libraries(${PROJECT_NAME}server ${LEVELDB_LIBRARY})
 	endif()
 	if (USE_REDIS)
-		target_link_libraries(${PROJECT_NAME_LOWER}server ${REDIS_LIBRARY})
+		target_link_libraries(${PROJECT_NAME}server ${REDIS_LIBRARY})
 	endif()
 	if(USE_CURL)
 		target_link_libraries(
-			${PROJECT_NAME_LOWER}server
+			${PROJECT_NAME}server
 			${CURL_LIBRARY}
 		)
 	endif()
@@ -641,7 +645,7 @@ if(WIN32)
 endif()
 
 if(BUILD_CLIENT)
-	install(TARGETS ${PROJECT_NAME_LOWER}
+	install(TARGETS ${PROJECT_NAME}
 		RUNTIME DESTINATION ${BINDIR}
 		LIBRARY DESTINATION ${BINDIR}
 		ARCHIVE DESTINATION ${BINDIR}
@@ -659,7 +663,7 @@ if(BUILD_CLIENT)
 	if(USE_GETTEXT)
 		foreach(LOCALE ${GETTEXT_AVAILABLE_LOCALES})
 			set_mo_paths(MO_BUILD_PATH MO_DEST_PATH ${LOCALE})
-			set(MO_BUILD_PATH "${MO_BUILD_PATH}/${PROJECT_NAME_LOWER}.mo")
+			set(MO_BUILD_PATH "${MO_BUILD_PATH}/${PROJECT_NAME}.mo")
 			install(FILES ${MO_BUILD_PATH} DESTINATION ${MO_DEST_PATH})
 		endforeach()
 	endif()
@@ -680,16 +684,16 @@ if(BUILD_CLIENT)
 endif(BUILD_CLIENT)
 
 if(BUILD_SERVER)
-	install(TARGETS ${PROJECT_NAME_LOWER}server DESTINATION ${BINDIR})
+	install(TARGETS ${PROJECT_NAME}server DESTINATION ${BINDIR})
 endif()
 
 if (USE_GETTEXT)
 	set(MO_FILES)
 
 	foreach(LOCALE ${GETTEXT_AVAILABLE_LOCALES})
-		set(PO_FILE_PATH "${GETTEXT_PO_PATH}/${LOCALE}/${PROJECT_NAME_LOWER}.po")
+		set(PO_FILE_PATH "${GETTEXT_PO_PATH}/${LOCALE}/${PROJECT_NAME}.po")
 		set_mo_paths(MO_BUILD_PATH MO_DEST_PATH ${LOCALE})
-		set(MO_FILE_PATH "${MO_BUILD_PATH}/${PROJECT_NAME_LOWER}.mo")
+		set(MO_FILE_PATH "${MO_BUILD_PATH}/${PROJECT_NAME}.mo")
 
 		add_custom_command(OUTPUT ${MO_BUILD_PATH}
 			COMMAND ${CMAKE_COMMAND} -E make_directory ${MO_BUILD_PATH}

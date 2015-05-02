@@ -388,11 +388,11 @@ void Client::step(float dtime)
 		if(counter <= 0.0) {
 			counter = 2.0;
 
-			Player *myplayer = m_env.getLocalPlayer();		
+			Player *myplayer = m_env.getLocalPlayer();
 			FATAL_ERROR_IF(myplayer == NULL, "Local player not found in environment.");
 
-			// Send TOSERVER_INIT
-			// [0] u16 TOSERVER_INIT
+			// Send TOSERVER_INIT_LEGACY
+			// [0] u16 TOSERVER_INIT_LEGACY
 			// [2] u8 SER_FMT_VER_HIGHEST_READ
 			// [3] u8[20] player_name
 			// [23] u8[28] password (new in some version)
@@ -1062,8 +1062,8 @@ void Client::sendChatMessage(const std::wstring &message)
 	Send(&pkt);
 }
 
-void Client::sendChangePassword(const std::wstring &oldpassword,
-        const std::wstring &newpassword)
+void Client::sendChangePassword(const std::string &oldpassword,
+        const std::string &newpassword)
 {
 	Player *player = m_env.getLocalPlayer();
 	if(player == NULL)
@@ -1631,7 +1631,7 @@ void Client::afterContentReceived(IrrlichtDevice *device)
 	draw_load_screen(text, device, guienv, 0, 72);
 	m_nodedef->updateAliases(m_itemdef);
 	m_nodedef->setNodeRegistrationStatus(true);
-	m_nodedef->runNodeResolverCallbacks();
+	m_nodedef->runNodeResolveCallbacks();
 	delete[] text;
 
 	// Update node textures and assign shaders to each tile
@@ -1709,7 +1709,7 @@ void Client::makeScreenshot(IrrlichtDevice *device)
 	struct tm *tm = localtime(&t);
 
 	char timetstamp_c[64];
-	strftime(timetstamp_c, sizeof(timetstamp_c), "%FT%T", tm);
+	strftime(timetstamp_c, sizeof(timetstamp_c), "%Y%m%d_%H%M%S", tm);
 
 	std::string filename_base = g_settings->get("screenshot_path")
 			+ DIR_DELIM
@@ -1722,7 +1722,7 @@ void Client::makeScreenshot(IrrlichtDevice *device)
 	unsigned serial = 0;
 
 	while (serial < SCREENSHOT_MAX_SERIAL_TRIES) {
-		filename = filename_base + (serial > 0 ? ("-" + itos(serial)) : "") + filename_ext;
+		filename = filename_base + (serial > 0 ? ("_" + itos(serial)) : "") + filename_ext;
 		std::ifstream tmp(filename.c_str());
 		if (!tmp.good())
 			break;	// File did not apparently exist, we'll go with it

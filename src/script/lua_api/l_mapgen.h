@@ -22,12 +22,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "lua_api/l_base.h"
 
-class INodeDefManager;
-struct NodeResolveInfo;
-class DecoSimple;
-class DecoSchematic;
-class SchematicManager;
-
 class ModApiMapgen : public ModApiBase {
 private:
 	// get_mapgen_object(objectname)
@@ -84,6 +78,9 @@ private:
 	// place_schematic(p, schematic, rotation, replacement)
 	static int l_place_schematic(lua_State *L);
 
+	// serialize_schematic(schematic, format, options={...})
+	static int l_serialize_schematic(lua_State *L);
+
 public:
 	static void Initialize(lua_State *L, int top);
 
@@ -92,6 +89,8 @@ public:
 	static struct EnumString es_MapgenObject[];
 	static struct EnumString es_OreType[];
 	static struct EnumString es_Rotation[];
+	static struct EnumString es_SchematicFormatType[];
+	static struct EnumString es_NodeResolveMethod[];
 };
 
 #endif /* L_MAPGEN_H_ */

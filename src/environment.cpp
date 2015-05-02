@@ -840,9 +840,8 @@ bool ServerEnvironment::swapNode(v3s16 p, const MapNode &n)
 	return true;
 }
 
-std::set<u16> ServerEnvironment::getObjectsInsideRadius(v3f pos, float radius)
+void ServerEnvironment::getObjectsInsideRadius(std::vector<u16> &objects, v3f pos, float radius)
 {
-	std::set<u16> objects;
 	for(std::map<u16, ServerActiveObject*>::iterator
 			i = m_active_objects.begin();
 			i != m_active_objects.end(); ++i)
@@ -852,9 +851,8 @@ std::set<u16> ServerEnvironment::getObjectsInsideRadius(v3f pos, float radius)
 		v3f objectpos = obj->getBasePosition();
 		if(objectpos.getDistanceFrom(pos) > radius)
 			continue;
-		objects.insert(id);
+		objects.push_back(id);
 	}
-	return objects;
 }
 
 void ServerEnvironment::clearAllObjects()
@@ -1240,7 +1238,7 @@ void ServerEnvironment::step(float dtime)
 			// Read messages from object
 			while(!obj->m_messages_out.empty())
 			{
-				m_active_object_messages.push_back(
+				m_active_object_messages.push(
 						obj->m_messages_out.front());
 				obj->m_messages_out.pop();
 			}
@@ -1464,7 +1462,7 @@ ActiveObjectMessage ServerEnvironment::getActiveObjectMessage()
 		return ActiveObjectMessage(0);
 
 	ActiveObjectMessage message = m_active_object_messages.front();
-	m_active_object_messages.pop_front();
+	m_active_object_messages.pop();
 	return message;
 }
 

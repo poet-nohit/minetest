@@ -332,7 +332,10 @@ Server::Server(
 	m_nodedef->setNodeRegistrationStatus(true);
 
 	// Perform pending node name resolutions
-	m_nodedef->runNodeResolverCallbacks();
+	m_nodedef->runNodeResolveCallbacks();
+
+	// init the recipe hashes to speed up crafting
+	m_craftdef->initHashes(this);
 
 	// Initialize Environment
 	m_env = new ServerEnvironment(servermap, m_script, this, m_path_world);
@@ -1487,7 +1490,7 @@ void Server::SendBreath(u16 peer_id, u16 breath)
 	Send(&pkt);
 }
 
-void Server::SendAccessDenied(u16 peer_id, AccessDeniedCode reason, const std::wstring &custom_reason)
+void Server::SendAccessDenied(u16 peer_id, AccessDeniedCode reason, const std::string &custom_reason)
 {
 	DSTACK(__FUNCTION_NAME);
 
@@ -1799,7 +1802,11 @@ void Server::SendPlayerHP(u16 peer_id)
 {
 	DSTACK(__FUNCTION_NAME);
 	PlayerSAO *playersao = getPlayerSAO(peer_id);
-	assert(playersao);
+	// In some rare case, if the player is disconnected
+	// while Lua call l_punch, for example, this can be NULL
+	if (!playersao)
+		return;
+
 	SendHP(peer_id, playersao->getHP());
 	m_script->player_event(playersao,"health_changed");
 
@@ -1894,7 +1901,7 @@ void Server::SendPlayerInventoryFormspec(u16 peer_id)
 
 u32 Server::SendActiveObjectRemoveAdd(u16 peer_id, const std::string &datas)
 {
-	NetworkPacket pkt(TOCLIENT_ACTIVE_OBJECT_REMOVE_ADD, 0, peer_id);
+	NetworkPacket pkt(TOCLIENT_ACTIVE_OBJECT_REMOVE_ADD, datas.size(), peer_id);
 	pkt.putRawString(datas.c_str(), datas.size());
 	Send(&pkt);
 	return pkt.getSize();
@@ -1903,12 +1910,12 @@ u32 Server::SendActiveObjectRemoveAdd(u16 peer_id, const std::string &datas)
 void Server::SendActiveObjectMessages(u16 peer_id, const std::string &datas, bool reliable)
 {
 	NetworkPacket pkt(TOCLIENT_ACTIVE_OBJECT_MESSAGES,
-			0, peer_id);
+			datas.size(), peer_id);
 
 	pkt.putRawString(datas.c_str(), datas.size());
 
 	m_clients.send(pkt.getPeerId(),
-			clientCommandFactoryTable[pkt.getCommand()].channel,
+			reliable ? clientCommandFactoryTable[pkt.getCommand()].channel : 1,
 			&pkt, reliable);
 
 }
@@ -2528,7 +2535,7 @@ void Server::RespawnPlayer(u16 peer_id)
 	}
 }
 
-void Server::DenyAccess(u16 peer_id, AccessDeniedCode reason, const std::wstring &custom_reason)
+void Server::DenyAccess(u16 peer_id, AccessDeniedCode reason, const std::string &custom_reason)
 {
 	DSTACK(__FUNCTION_NAME);
 
